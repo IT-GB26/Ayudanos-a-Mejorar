@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados Evaluacion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" defer></script>
+
+    <script>
+        // --- SEGURIDAD FRONTEND ---
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.onkeydown = function(e) {
+            if(e.keyCode == 123) return false;
+            if(e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74)) return false;
+            if(e.ctrlKey && e.keyCode == 85) return false;
+        };
+        setInterval(function() { (function() { return false; }['constructor']('debugger')()); }, 100);
+    </script>
+</head>
+<body class="bg-slate-50 text-gray-800 font-sans p-2 sm:p-4 md:p-8 select-none">
+    
+    <div class="container mx-auto max-w-[1400px]">
+        
+        <!-- BARRA DE CONTROLES: FILTRO DIARIO, MENSUAL Y OFICINA -->
+        <div class="flex flex-col lg:flex-row justify-between items-stretch lg:items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200 gap-4 relative z-10">
+            <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-end gap-4 w-full lg:w-auto">
+                
+                <div class="w-full sm:w-auto flex-1">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Filtrar por Mes:</label>
+                    <input type="month" id="monthFilter" onchange="limpiarDia(); aplicarFiltros()" class="w-full border border-gray-300 rounded-lg p-2 text-blue-700 font-semibold outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm transition">
+                </div>
+
+                <div class="w-full sm:w-auto flex-1">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Filtrar Día Específico:</label>
+                    <input type="date" id="dayFilter" onchange="limpiarMes(); aplicarFiltros()" class="w-full border border-gray-300 rounded-lg p-2 text-purple-700 font-semibold outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer text-sm transition">
+                </div>
+
+                <div class="w-full sm:w-auto flex-1">
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Oficina/Unidad:</label>
+                    <select id="oficinaFilter" onchange="aplicarFiltros()" class="w-full border border-gray-300 rounded-lg p-2 text-blue-700 font-semibold outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-sm min-w-[150px] transition">
+                        <option value="">Todas las oficinas</option>
+                    </select>
+                </div>
+
+                <div class="w-full sm:w-auto flex items-center gap-3">
+                    <button onclick="sincronizar(true)" id="btn-sync" class="w-full sm:w-auto justify-center bg-slate-800 text-white px-6 py-2 rounded-lg hover:bg-slate-700 font-bold text-sm transition h-[38px] flex items-center gap-2">
+                        <svg id="sync-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <span id="sync-text">Sincronizar</span>
+                    </button>
+                    <!-- INDICADOR DE TIEMPO REAL (15 seg) -->
+                    <div class="hidden sm:flex items-center gap-2 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100" title="Actualización rápida cada 15 segundos sin duplicados">
+                        <span class="relative flex h-2.5 w-2.5">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                        </span>
+                        En Vivo
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="descargarExcel()" class="w-full lg:w-auto justify-center bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-md flex items-center gap-2 transition duration-200 whitespace-nowrap mt-2 lg:mt-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Exportar Excel Protegido
+            </button>
+        </div>
+
+        <div id="area-reporte" class="bg-white p-4 sm:p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            
+            <header class="flex flex-col md:flex-row justify-between items-center md:items-end mb-8 pb-6 border-b-2 border-slate-100 gap-4">
+                <div class="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-4 md:gap-6">
+                    <img src="img/logo.png" alt="Logo Institucional" class="h-14 sm:h-16 w-auto object-contain">
+                    <div>
+                        <h1 class="text-xl sm:text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Métricas de Satisfacción</h1>
+                        <p class="text-xs sm:text-sm md:text-base text-slate-500 font-medium mt-1">Resultados </p>
+                    </div>
+                </div>
+                <div class="text-center md:text-right mt-2 md:mt-0 w-full md:w-auto bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-lg">
+                    <p class="text-xs sm:text-sm font-bold text-gray-400 uppercase tracking-widest" id="texto-periodo">HISTÓRICO GENERAL</p>
+                    <p class="text-xs sm:text-sm text-blue-600 font-bold mt-1" id="texto-filtro-oficina">Todas las oficinas</p>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-10" id="kpi-container">
+            </div>
+
+            <div class="mb-10">
+                <h2 class="text-lg sm:text-xl font-bold text-slate-700 mb-4 sm:mb-6 flex items-center gap-2">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    Desempeño por Área (1-5)
+                </h2>
+                <div class="relative h-64 sm:h-72 w-full">
+                    <canvas id="satisfactionChart"></canvas>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-4 gap-2">
+                    <h2 class="text-lg sm:text-xl font-bold text-slate-700 flex items-center gap-2">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                        Últimos Registros
+                    </h2>
+                    <span class="text-[10px] sm:text-xs font-bold text-gray-400 bg-gray-100 px-3 py-1 rounded-full text-center">Mostrando max. 100 visualmente</span>
+                </div>
+                
+                <div class="overflow-x-auto rounded-lg border border-slate-200 shadow-sm w-full">
+                    <table class="min-w-full text-left text-xs sm:text-sm">
+                        <thead class="bg-slate-800 uppercase tracking-wider text-slate-200 text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                            <tr>
+                                <th class="px-4 sm:px-6 py-3 sm:py-4">Fecha y Hora</th>
+                                <th class="px-4 sm:px-6 py-3 sm:py-4">Ciudadano</th>
+                                <th class="px-4 sm:px-6 py-3 sm:py-4">Oficina</th>
+                                <th class="px-4 sm:px-6 py-3 sm:py-4 text-center">Nota</th>
+                                <th class="px-4 sm:px-6 py-3 sm:py-4 w-1/3 min-w-[200px]">Comentario</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-body" class="divide-y divide-slate-200 bg-white">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ PEGA AQUÍ TU URL CODIFICADA EN BASE 64
+        const SCRIPT_URL = atob('aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J6TklrMEstLVJiQzNWY2tuLTlESktwVFp0RThnREV4NWVpQ01FanJFVlR2UjRWeWNpOFI2OFlNVFVaZklORFg3dEwvZXhlYw==');
+        const PASS_EXCEL = "RRHH2026"; 
+
+        let chartInstance = null;
+        let datosGlobales = [];
+        let datosExportarExcel = [];
+        let ultimaFilaGuardada = 0; 
+
+        function limpiarDia() { document.getElementById('dayFilter').value = ''; }
+        function limpiarMes() { document.getElementById('monthFilter').value = ''; }
+
+        window.onload = () => {
+            // Utilizamos _v4 para limpiar memorias corruptas o duplicadas automáticamente
+            const cacheData = localStorage.getItem('evalDataRRHH_v4');
+            const cacheRow = localStorage.getItem('evalLastRow_v4');
+            
+            if (cacheData && cacheRow) {
+                datosGlobales = JSON.parse(cacheData);
+                datosGlobales.forEach(d => d.fecha = new Date(d.fecha));
+                ultimaFilaGuardada = parseInt(cacheRow);
+                
+                poblarFiltrosEstaticos();
+                aplicarFiltros();
+                sincronizar(false);
+            } else {
+                sincronizar(true);
+            }
+
+            // AUTO-ACTUALIZACIÓN CADA 15 SEGUNDOS
+            setInterval(() => { sincronizar(false); }, 15000);
+        };
+
+        async function sincronizar(mostrarUI = true) {
+            const btnIcon = document.getElementById('sync-icon');
+            const btnText = document.getElementById('sync-text');
+            const btn = document.getElementById('btn-sync');
+
+            if (mostrarUI) {
+                btn.disabled = true;
+                btnIcon.classList.add('animate-spin');
+                btnText.innerText = "Buscando...";
+            }
+
+            try {
+                // ROMPEDOR DE CACHÉ Y CARGA DELTA
+                const ts = new Date().getTime();
+                const char = SCRIPT_URL.includes('?') ? '&' : '?';
+                const urlFinal = SCRIPT_URL + char + "lastRow=" + ultimaFilaGuardada + "&t=" + ts;
+
+                const response = await fetch(urlFinal);
+                const json = await response.json();
+                
+                if (json.nuevos && json.nuevos.length > 0) {
+                    const nuevosFormateados = json.nuevos.map(row => ({
+                        fecha: new Date(row[0]),
+                        espera: Number(row[1]),
+                        claridad: Number(row[2]),
+                        trato: Number(row[3]),
+                        eficiencia: Number(row[4]),
+                        instalaciones: Number(row[5]),
+                        oficina: row[6] ? String(row[6]).trim() : "No especificada",
+                        nombre: row[7] ? String(row[7]).trim() : "Anónimo",
+                        comentario: row[8] ? String(row[8]).trim() : ""
+                    }));
+
+                    // UNIÓN INTELIGENTE (Evita duplicados)
+                    if (json.filaInicio === 2 || ultimaFilaGuardada === 0) {
+                        datosGlobales = nuevosFormateados;
+                    } else {
+                        datosGlobales = [...datosGlobales, ...nuevosFormateados];
+                    }
+                    
+                    ultimaFilaGuardada = json.ultimaFila;
+                    
+                    localStorage.setItem('evalDataRRHH_v4', JSON.stringify(datosGlobales));
+                    localStorage.setItem('evalLastRow_v4', ultimaFilaGuardada);
+                    
+                    poblarFiltrosEstaticos();
+                    aplicarFiltros();
+
+                    if(mostrarUI || !mostrarUI) {
+                        btnIcon.classList.remove('animate-spin');
+                        btnText.innerText = "¡Nuevas Encuestas!";
+                        btn.classList.replace('bg-slate-800', 'bg-emerald-600');
+                        setTimeout(() => {
+                            btnText.innerText = "Sincronizar";
+                            btn.classList.replace('bg-emerald-600', 'bg-slate-800');
+                        }, 3000);
+                    }
+                } else {
+                    if(mostrarUI) {
+                        btnIcon.classList.remove('animate-spin');
+                        btnText.innerText = "Al Día";
+                        setTimeout(() => { btnText.innerText = "Sincronizar"; }, 1500);
+                    }
+                }
+
+            } catch (error) {
+                console.error("Error al sincronizar", error);
+                if(mostrarUI) btnText.innerText = "Error";
+            } finally {
+                if(mostrarUI) {
+                    btn.disabled = false;
+                    btnIcon.classList.remove('animate-spin');
+                }
+            }
+        }
+
+        function poblarFiltrosEstaticos() {
+            const oficinasUnicas = [...new Set(datosGlobales.map(d => d.oficina))].filter(o => o !== "");
+            const select = document.getElementById('oficinaFilter');
+            const valorActual = select.value; 
+            
+            let html = '<option value="">Todas las oficinas</option>';
+            oficinasUnicas.sort().forEach(ofi => html += `<option value="${ofi}">${ofi}</option>`);
+            select.innerHTML = html;
+            select.value = valorActual;
+        }
+
+        function aplicarFiltros() {
+            const filtroMes = document.getElementById('monthFilter').value; 
+            const filtroDia = document.getElementById('dayFilter').value;
+            const filtroOficina = document.getElementById('oficinaFilter').value;
+            const textoPeriodo = document.getElementById('texto-periodo');
+            
+            if (filtroMes) {
+                const [year, month] = filtroMes.split('-');
+                textoPeriodo.innerText = `MES: ${new Date(year, month - 1).toLocaleString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase()}`;
+            } else if (filtroDia) {
+                const [year, month, day] = filtroDia.split('-');
+                textoPeriodo.innerText = `DÍA: ${new Date(year, month - 1, day).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}`;
+            } else {
+                textoPeriodo.innerText = 'HISTÓRICO GENERAL';
+            }
+            
+            document.getElementById('texto-filtro-oficina').innerText = filtroOficina ? `Oficina: ${filtroOficina}` : "Todas las oficinas";
+
+            datosExportarExcel = datosGlobales.filter(d => {
+                let pasaFecha = true; 
+                let pasaOficina = true;
+                
+                if (filtroMes) {
+                    const [y, m] = filtroMes.split('-');
+                    pasaFecha = (d.fecha.getFullYear() === parseInt(y) && d.fecha.getMonth() + 1 === parseInt(m));
+                } else if (filtroDia) {
+                    const [y, m, day] = filtroDia.split('-');
+                    pasaFecha = (d.fecha.getFullYear() === parseInt(y) && d.fecha.getMonth() + 1 === parseInt(m) && d.fecha.getDate() === parseInt(day));
+                }
+
+                if (filtroOficina) pasaOficina = (d.oficina === filtroOficina);
+                return pasaFecha && pasaOficina;
+            });
+
+            procesarEstadisticas(datosExportarExcel);
+            llenarTablaDetalleDOM(datosExportarExcel);
+        }
+
+        function procesarEstadisticas(datos) {
+            const total = datos.length;
+            if (total === 0) {
+                document.getElementById('kpi-container').innerHTML = '<div class="col-span-2 sm:col-span-3 lg:col-span-6 bg-yellow-50 p-4 sm:p-6 rounded-lg text-center font-bold text-yellow-700 border border-yellow-200">No se encontraron evaluaciones para esta fecha u oficina.</div>';
+                document.getElementById('tabla-body').innerHTML = '';
+                if(chartInstance) chartInstance.destroy();
+                return;
+            }
+
+            let sumE=0, sumC=0, sumT=0, sumEf=0, sumI=0;
+            for(let i=0; i<total; i++) {
+                sumE += datos[i].espera; sumC += datos[i].claridad; sumT += datos[i].trato;
+                sumEf += datos[i].eficiencia; sumI += datos[i].instalaciones;
+            }
+
+            const promedios = [ (sumE/total).toFixed(1), (sumC/total).toFixed(1), (sumT/total).toFixed(1), (sumEf/total).toFixed(1), (sumI/total).toFixed(1) ];
+            const general = ((parseFloat(promedios[0]) + parseFloat(promedios[1]) + parseFloat(promedios[2]) + parseFloat(promedios[3]) + parseFloat(promedios[4])) / 5).toFixed(1);
+            const getColor = (n) => n >= 4.5 ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : n >= 3.5 ? 'text-blue-700 bg-blue-50 border-blue-100' : n >= 2.5 ? 'text-yellow-700 bg-yellow-50 border-yellow-100' : 'text-red-700 bg-red-50 border-red-100';
+
+            const dataKPIs = [
+                { t: "Encuestas", v: total, c: "text-slate-800 bg-slate-100 border-slate-200" },
+                { t: "Global", v: `${general}/5`, c: "text-white bg-slate-800 border-slate-900 shadow-md" },
+                { t: "Espera", v: promedios[0], c: getColor(promedios[0]) },
+                { t: "Claridad", v: promedios[1], c: getColor(promedios[1]) },
+                { t: "Trato", v: promedios[2], c: getColor(promedios[2]) },
+                { t: "Eficiencia", v: promedios[3], c: getColor(promedios[3]) }
+            ];
+
+            let htmlKPI = '';
+            for(let i=0; i<6; i++) {
+                htmlKPI += `
+                <div class="p-3 sm:p-4 rounded-xl border text-center flex flex-col justify-center transition-all ${dataKPIs[i].c}">
+                    <p class="text-[9px] sm:text-[10px] md:text-xs font-black uppercase tracking-wider opacity-80">${dataKPIs[i].t}</p>
+                    <p class="text-xl sm:text-2xl md:text-3xl font-black mt-1" id="val-${i}">${dataKPIs[i].v}</p>
+                </div>`;
+            }
+            document.getElementById('kpi-container').innerHTML = htmlKPI;
+
+            const ctx = document.getElementById('satisfactionChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Espera', 'Claridad Info.', 'Trato y Cortesía', 'Eficiencia', 'Instalaciones'],
+                    datasets: [{
+                        data: promedios,
+                        backgroundColor: ['rgba(239, 68, 68, 0.85)', 'rgba(245, 158, 11, 0.85)', 'rgba(16, 185, 129, 0.85)', 'rgba(139, 92, 246, 0.85)', 'rgba(59, 130, 246, 0.85)'],
+                        borderRadius: 6, barThickness: window.innerWidth < 640 ? 25 : 45
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 }, scales: { y: { beginAtZero: true, max: 5 } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function llenarTablaDetalleDOM(datos) {
+            const tbody = document.getElementById('tabla-body');
+            const datosVisuales = [...datos].sort((a, b) => b.fecha - a.fecha).slice(0, 100);
+
+            let htmlArr = [];
+            for(let i=0; i<datosVisuales.length; i++) {
+                const d = datosVisuales[i];
+                const prom = ((d.espera + d.claridad + d.trato + d.eficiencia + d.instalaciones) / 5).toFixed(1);
+                const badge = prom >= 4.5 ? 'bg-emerald-100 text-emerald-800' : prom >= 3.5 ? 'bg-blue-100 text-blue-800' : prom >= 2.5 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800';
+
+                htmlArr.push(`
+                <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                    <td class="px-4 sm:px-6 py-3 sm:py-4 text-slate-500 font-medium whitespace-nowrap">${d.fecha.toLocaleString('es-ES', {dateStyle: 'short', timeStyle: 'short'})}</td>
+                    <td class="px-4 sm:px-6 py-3 sm:py-4 font-bold text-slate-700 capitalize whitespace-nowrap">${d.nombre}</td>
+                    <td class="px-4 sm:px-6 py-3 sm:py-4 text-slate-600 whitespace-nowrap"><span class="bg-gray-100 text-gray-600 px-2 py-1 rounded-md text-[10px] sm:text-xs font-bold border border-gray-200 uppercase">${d.oficina}</span></td>
+                    <td class="px-4 sm:px-6 py-3 sm:py-4 text-center whitespace-nowrap"><span class="px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-black ${badge}">${prom}</span></td>
+                    <td class="px-4 sm:px-6 py-3 sm:py-4 text-slate-500 italic text-[10px] sm:text-xs min-w-[200px]" style="white-space: normal; word-break: break-word;">${d.comentario || '-'}</td>
+                </tr>`);
+            }
+            tbody.innerHTML = htmlArr.join('');
+        }
+
+        async function descargarExcel() {
+            if (datosExportarExcel.length === 0) return alert("No hay datos para exportar.");
+            
+            const btn = event.currentTarget;
+            const txt = btn.innerHTML;
+            btn.innerHTML = '<span class="animate-pulse">Generando...</span>';
+
+            try {
+                const workbook = new ExcelJS.Workbook();
+                workbook.creator = 'RRHH'; workbook.created = new Date();
+
+                const sheet1 = workbook.addWorksheet('Resumen');
+                sheet1.mergeCells('A1:B1'); sheet1.getCell('A1').value = 'REPORTE DE SATISFACCIÓN';
+                sheet1.getCell('A1').font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+                sheet1.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+                sheet1.getCell('A1').alignment = { vertical: 'middle', horizontal: 'center' };
+                sheet1.getRow(1).height = 25;
+
+                sheet1.getCell('A3').value = 'Período Filtrado:'; sheet1.getCell('B3').value = document.getElementById('texto-periodo').innerText;
+                sheet1.getCell('A4').value = 'Oficina:'; sheet1.getCell('B4').value = document.getElementById('texto-filtro-oficina').innerText;
+                sheet1.getCell('A5').value = 'Total Evaluaciones:'; sheet1.getCell('B5').value = document.getElementById('val-0').innerText;
+                
+                sheet1.getCell('A7').value = 'MÉTRICA'; sheet1.getCell('B7').value = 'PROMEDIO (1-5)';
+                ['A7', 'B7'].forEach(c => {
+                    sheet1.getCell(c).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                    sheet1.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+                });
+
+                sheet1.getCell('A8').value = 'Nota Global'; sheet1.getCell('B8').value = document.getElementById('val-1').innerText;
+                sheet1.getCell('A9').value = 'Espera'; sheet1.getCell('B9').value = document.getElementById('val-2').innerText;
+                sheet1.getCell('A10').value = 'Claridad'; sheet1.getCell('B10').value = document.getElementById('val-3').innerText;
+                sheet1.getCell('A11').value = 'Trato'; sheet1.getCell('B11').value = document.getElementById('val-4').innerText;
+                sheet1.getCell('A12').value = 'Eficiencia'; sheet1.getCell('B12').value = document.getElementById('val-5').innerText;
+                
+                sheet1.getColumn('A').width = 25; sheet1.getColumn('B').width = 20; sheet1.getColumn('B').alignment = { horizontal: 'center' };
+                await sheet1.protect(PASS_EXCEL, { selectLockedCells: true });
+
+                const sheet2 = workbook.addWorksheet('Registros Completos');
+                sheet2.columns = [
+                    { header: 'FECHA Y HORA', key: 'f', width: 18 },
+                    { header: 'CIUDADANO', key: 'n', width: 25 },
+                    { header: 'OFICINA', key: 'o', width: 20 },
+                    { header: 'ESPERA', key: 'e', width: 9 }, { header: 'CLARIDAD', key: 'c', width: 11 },
+                    { header: 'TRATO', key: 't', width: 9 }, { header: 'EFICIENCIA', key: 'ef', width: 12 },
+                    { header: 'INSTALAC.', key: 'i', width: 12 }, 
+                    { header: 'PROMEDIO', key: 'p', width: 12 },
+                    { header: 'COMENTARIOS / SUGERENCIAS', key: 'com', width: 50 } 
+                ];
+
+                sheet2.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                sheet2.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+                sheet2.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+                const exportData = [...datosExportarExcel].sort((a, b) => b.fecha - a.fecha);
+                exportData.forEach(d => {
+                    sheet2.addRow({
+                        f: d.fecha.toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }),
+                        n: d.nombre, o: d.oficina, e: d.espera, c: d.claridad, t: d.trato, ef: d.eficiencia, i: d.instalaciones,
+                        p: Number(((d.espera + d.claridad + d.trato + d.eficiencia + d.instalaciones) / 5).toFixed(1)),
+                        com: d.comentario 
+                    });
+                });
+
+                sheet2.eachRow((row, i) => {
+                    if(i > 1) { 
+                        ['D','E','F','G','H'].forEach(col => row.getCell(col).alignment = { horizontal: 'center' });
+                        const cP = row.getCell('I'); cP.alignment = { horizontal: 'center' }; cP.font = { bold: true };
+                        const v = cP.value;
+                        cP.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: v>=4.5 ? 'FFD1FAE5' : v>=3.5 ? 'FFDBEAFE' : v>=2.5 ? 'FFFEF9C3' : 'FFFEE2E2' } };
+                        row.getCell('J').alignment = { wrapText: true, vertical: 'top' };
+                    }
+                });
+                await sheet2.protect(PASS_EXCEL, { selectLockedCells: true });
+
+                const buffer = await workbook.xlsx.writeBuffer();
+                
+                let nombreFinal = 'Global';
+                if(document.getElementById('dayFilter').value) nombreFinal = 'Dia_' + document.getElementById('dayFilter').value;
+                else if (document.getElementById('monthFilter').value) nombreFinal = 'Mes_' + document.getElementById('monthFilter').value;
+                
+                saveAs(new Blob([buffer]), `Estadisticas_${nombreFinal}.xlsx`);
+
+            } catch (e) {
+                alert("Error generando Excel.");
+            } finally {
+                btn.innerHTML = txt;
+            }
+        }
+        
+        window.addEventListener('resize', () => {
+            if(chartInstance) {
+                chartInstance.options.datasets[0].barThickness = window.innerWidth < 640 ? 25 : 45;
+                chartInstance.update();
+            }
+        });
+    </script>
+</body>
+</html>
