@@ -42,7 +42,7 @@
         <div id="main-content">
             <div class="text-center mb-8 border-b border-slate-100 pb-6">
                 <h1 class="text-2xl md:text-3xl font-black text-slate-800">Ayúdanos a Mejorar</h1>
-                <p class="text-sm md:text-base text-slate-500 mt-2">Su opinión es fundamental para mejorar nuestra calidad de servicio.</p>
+                <p class="text-sm md:text-base text-slate-500 mt-2">Su opinión es fundamental para fortalecer el control interno y la optimización de nuestros servicios.</p>
             </div>
 
             <form id="evalForm">
@@ -75,28 +75,42 @@
                             </p>
                         </div>
 
+                        <!-- PREGUNTA 1 -->
                         <div class="bg-white scroll-mt-4" id="caja-espera">
-                            <label class="block text-sm font-bold text-slate-700 mb-3">1. Tiempo de espera</label>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">1. Tiempo de espera</label>
+                            <p class="text-xs text-slate-500 mb-3 leading-relaxed">¿El tiempo transcurrido desde su llegada hasta ser atendido fue razonable?</p>
                             <div id="espera" class="w-full"></div>
                         </div>
                         <hr class="border-slate-50">
+
+                        <!-- PREGUNTA 2 -->
                         <div class="bg-white scroll-mt-4" id="caja-claridad">
-                            <label class="block text-sm font-bold text-slate-700 mb-3">2. Claridad y oportunidad</label>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">2. Claridad y oportunidad de la información</label>
+                            <p class="text-xs text-slate-500 mb-3 leading-relaxed">¿La información brindada por el servidor municipal fue clara, precisa y resolvió su duda?</p>
                             <div id="claridad" class="w-full"></div>
                         </div>
                         <hr class="border-slate-50">
+
+                        <!-- PREGUNTA 3 -->
                         <div class="bg-white scroll-mt-4" id="caja-trato">
-                            <label class="block text-sm font-bold text-slate-700 mb-3">3. Trato y cortesía</label>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">3. Trato y cortesía</label>
+                            <p class="text-xs text-slate-500 mb-3 leading-relaxed">¿El personal le atendió con respeto, amabilidad y vocación de servicio?</p>
                             <div id="trato" class="w-full"></div>
                         </div>
                         <hr class="border-slate-50">
+
+                        <!-- PREGUNTA 4 -->
                         <div class="bg-white scroll-mt-4" id="caja-eficiencia">
-                            <label class="block text-sm font-bold text-slate-700 mb-3">4. Eficiencia en la gestión</label>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">4. Eficiencia del trámite</label>
+                            <p class="text-xs text-slate-500 mb-3 leading-relaxed">¿Su gestión o trámite fue resuelto con eficacia y sin burocracia innecesaria?</p>
                             <div id="eficiencia" class="w-full"></div>
                         </div>
                         <hr class="border-slate-50">
+
+                        <!-- PREGUNTA 5 -->
                         <div class="bg-white scroll-mt-4" id="caja-instalaciones">
-                            <label class="block text-sm font-bold text-slate-700 mb-3">5. Comodidad de instalaciones</label>
+                            <label class="block text-sm font-bold text-slate-700 mb-2">5. Instalaciones y accesibilidad</label>
+                            <p class="text-xs text-slate-500 mb-3 leading-relaxed">¿Las instalaciones físicas o los canales digitales fueron cómodos y accesibles?</p>
                             <div id="instalaciones" class="w-full"></div>
                         </div>
                     </div>
@@ -139,8 +153,8 @@
             html += '</div>';
             html += `
             <div class="flex justify-between w-full text-[10px] sm:text-xs font-bold px-1 mt-2">
-                <span class="text-red-500 bg-red-50 px-2 py-1 rounded-md">1 - Insatisfecho</span>
-                <span class="text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">5 - Satisfecho</span>
+                <span class="text-red-500 bg-red-50 px-2 py-1 rounded-md">1 - Muy insatisfecho</span>
+                <span class="text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">5 - Muy satisfecho</span>
             </div>`;
             document.getElementById(cat).innerHTML = html;
 
